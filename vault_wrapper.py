@@ -184,7 +184,8 @@ def main():
     ENVIRONMENTS = {
         "1": ("Nonprod", "http://127.0.0.1:8200"),
         "2": ("Preprod", "http://127.0.0.1:8200"),
-        "3": ("Prod", "http://127.0.0.1:8200")
+        "3": ("Prod", "http://127.0.0.1:8200"),
+        "4": ("Learni", "http://127.0.0.1:8200")
     }
     signal.signal(signal.SIGINT, handle_interrupt)
 
