@@ -7,7 +7,6 @@ import json
 
 ENVIRONMENTS = {}
 VAULT_BINARY = "D:\\vault\\vault.exe" if os.name == 'nt' else "vault"
-PAGE_SIZE = 10
 
 namespace = ""
 auth_mount_path = ""
@@ -18,10 +17,19 @@ def run_cmd(cmd):
         env = os.environ.copy()
         if namespace:
             env["VAULT_NAMESPACE"] = namespace
-        result = subprocess.run(full_cmd, capture_output=True, text=True, env=env)
-        return result.stdout if result.stdout else result.stderr
+        print(f"\n⏳ Running: {' '.join(full_cmd)} ... Please wait")
+        result = subprocess.run(full_cmd, capture_output=True, text=True, env=env, timeout=15)
+        output = result.stdout.strip()
+        error = result.stderr.strip()
+        if result.returncode != 0:
+            print("❌ Vault command failed.")
+            return f"❌ Vault Error (exit code {result.returncode}):\n{error or output}"
+        print("✅ Done.")
+        return output or error or "✅ Command executed, but no output returned."
+    except subprocess.TimeoutExpired:
+        return "⏱️ Command timed out. Please check Vault status, network, or auth settings."
     except Exception as e:
-        return f"Error: {e}"
+        return f"⚠️ Unexpected exception while running Vault command: {e}"
 
 def detect_kv_version(mount_path):
     try:
@@ -123,27 +131,6 @@ def list_existing_secrets(path):
     result = run_cmd(["vault", "kv", "list", path])
     print(result)
 
-def recursive_list_secrets(path, output_file=None):
-    discovered = []
-
-    def recurse(p):
-        result = run_cmd(["vault", "kv", "list", p])
-        lines = result.splitlines()
-        for line in lines:
-            line = line.strip()
-            if line.endswith('/'):
-                recurse(f"{p.rstrip('/')}/{line.strip('/')}")
-            else:
-                discovered.append(f"{p.rstrip('/')}/{line}")
-
-    recurse(path)
-    for i, item in enumerate(discovered):
-        print(f"{i+1:>3}) {item}")
-    if output_file:
-        with open(output_file, 'w') as f:
-            f.write('\n'.join(discovered))
-        print(f"\nExported {len(discovered)} paths to {output_file}")
-
 def read_secret():
     path = prompt_secret_path()
     if not path:
@@ -200,8 +187,7 @@ Choose an action:
 3) Browse & Read Secrets
 4) Write a Secret
 5) Vault Server Status
-6) Recursively List + Export Secrets
-7) Quit
+6) Quit
         """)
         choice = input("(Enter number or name)> ").strip().lower()
         if choice in ["1", "login"]:
@@ -214,11 +200,7 @@ Choose an action:
             write_secret()
         elif choice in ["5", "status"]:
             status()
-        elif choice in ["6", "export"]:
-            path = input("Enter base path to recursively list (e.g., secret/): ").strip()
-            output_file = input("Enter output file name (optional, leave blank to skip): ").strip()
-            recursive_list_secrets(path, output_file if output_file else None)
-        elif choice in ["7", "exit", "quit"]:
+        elif choice in ["6", "exit", "quit"]:
             print("👋 Exiting Vault Wrapper. See you soon!")
             break
         else:
